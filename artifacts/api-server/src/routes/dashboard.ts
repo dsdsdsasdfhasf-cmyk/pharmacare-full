@@ -154,4 +154,55 @@ router.get("/dashboard/low-stock", async (_req, res) => {
   })));
 });
 
+router.get("/dashboard/payment-breakdown", async (_req, res) => {
+  const thirtyDaysAgo = new Date();
+  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+  const rows = await db
+    .select({
+      paymentMethod: salesTable.paymentMethod,
+      count: sql<number>`count(*)::int`,
+      total: sql<number>`coalesce(sum(total_amount), 0)`,
+    })
+    .from(salesTable)
+    .where(and(gte(salesTable.createdAt, thirtyDaysAgo), eq(salesTable.status, "completed")))
+    .groupBy(salesTable.paymentMethod);
+
+  res.json(rows.map(r => ({
+    method: r.paymentMethod,
+    count: Number(r.count),
+    total: Number(r.total),
+  })));
+});
+
+router.get("/dashboard/weekly-comparison", async (_req, res) => {
+  const thisWeekStart = new Date();
+  thisWeekStart.setDate(thisWeekStart.getDate() - thisWeekStart.getDay());
+  thisWeekStart.setHours(0, 0, 0, 0);
+
+  const lastWeekStart = new Date(thisWeekStart);
+  lastWeekStart.setDate(lastWeekStart.getDate() - 7);
+  const lastWeekEnd = new Date(thisWeekStart);
+
+  const [thisWeek] = await db
+    .select({ revenue: sql<number>`coalesce(sum(total_amount), 0)`, count: sql<number>`count(*)::int` })
+    .from(salesTable)
+    .where(and(gte(salesTable.createdAt, thisWeekStart), eq(salesTable.status, "completed")));
+
+  const [lastWeek] = await db
+    .select({ revenue: sql<number>`coalesce(sum(total_amount), 0)`, count: sql<number>`count(*)::int` })
+    .from(salesTable)
+    .where(and(gte(salesTable.createdAt, lastWeekStart), sql`${salesTable.createdAt} < ${lastWeekEnd}`, eq(salesTable.status, "completed")));
+
+  const thisRev = Number(thisWeek?.revenue ?? 0);
+  const lastRev = Number(lastWeek?.revenue ?? 0);
+  const change = lastRev > 0 ? ((thisRev - lastRev) / lastRev) * 100 : 0;
+
+  res.json({
+    thisWeek: { revenue: thisRev, count: Number(thisWeek?.count ?? 0) },
+    lastWeek: { revenue: lastRev, count: Number(lastWeek?.count ?? 0) },
+    changePercent: change,
+  });
+});
+
 export default router;
