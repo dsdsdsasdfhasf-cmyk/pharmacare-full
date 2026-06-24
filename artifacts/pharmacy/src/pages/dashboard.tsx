@@ -1,22 +1,40 @@
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Link } from "wouter";
-import {
-  useGetDashboardSummary, useGetSalesChart, useGetTopMedicines, useGetLowStockAlerts,
-} from "@workspace/api-client-react";
+import { useGetDashboardSummary, useGetLowStockAlerts } from "@workspace/api-client-react";
 import {
   AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell,
-  ResponsiveContainer, Tooltip, XAxis, YAxis, CartesianGrid, Legend,
+  ResponsiveContainer, Tooltip, XAxis, YAxis, CartesianGrid,
 } from "recharts";
 import {
-  TrendingUp, TrendingDown, Pill, AlertTriangle, Clock,
-  ArrowLeft, DollarSign, Users, ShoppingCart, ArrowUpRight, ArrowDownRight,
+  TrendingUp, Pill, AlertTriangle, Clock,
+  ArrowLeft, DollarSign, Users, ArrowUpRight, ArrowDownRight,
 } from "lucide-react";
+
+type Period = "today" | "week" | "month" | "year";
+
+const PERIOD_LABELS: Record<Period, string> = {
+  today: "اليوم",
+  week: "الأسبوع",
+  month: "الشهر",
+  year: "السنة",
+};
 
 const METHOD_LABEL: Record<string, string> = { cash: "نقدي", card: "بطاقة", insurance: "تأمين" };
 const METHOD_COLOR: Record<string, string> = { cash: "#14b8a6", card: "#6366f1", insurance: "#f59e0b" };
 const PIE_COLORS = ["#14b8a6", "#6366f1", "#f59e0b", "#ef4444"];
+
+function fmtMoney(v: number) { return `${v.toFixed(0)} ج.م`; }
+
+function fmtDateLabel(d: string, period: Period) {
+  if (period === "today") return d; // already HH:00
+  const dt = new Date(d);
+  if (period === "year") return dt.toLocaleDateString("ar-EG", { month: "short", day: "numeric" });
+  return dt.toLocaleDateString("ar-EG", { month: "short", day: "numeric" });
+}
 
 function StatCard({
   title, value, sub, icon: Icon, color, trend, trendLabel,
@@ -50,20 +68,25 @@ function StatCard({
   );
 }
 
-function fmtDate(d: string) {
-  return new Date(d).toLocaleDateString("ar-EG", { month: "short", day: "numeric" });
-}
-function fmtMoney(v: number) { return `${v.toFixed(0)} ج.م`; }
-
 export default function Dashboard() {
+  const [period, setPeriod] = useState<Period>("month");
+
   const { data: summary, isLoading: loadingSummary } = useGetDashboardSummary();
-  const { data: chartData } = useGetSalesChart();
-  const { data: topMedicines } = useGetTopMedicines();
   const { data: lowStock } = useGetLowStockAlerts();
 
+  const { data: chartData } = useQuery<{ date: string; revenue: number; salesCount: number }[]>({
+    queryKey: ["/api/dashboard/sales-chart", period],
+    queryFn: () => fetch(`/api/dashboard/sales-chart?period=${period}`, { credentials: "include" }).then(r => r.json()),
+  });
+
+  const { data: topMedicines } = useQuery<{ medicineId: number; medicineName: string; totalQuantity: number; totalRevenue: number }[]>({
+    queryKey: ["/api/dashboard/top-medicines", period],
+    queryFn: () => fetch(`/api/dashboard/top-medicines?period=${period}`, { credentials: "include" }).then(r => r.json()),
+  });
+
   const { data: paymentBreakdown } = useQuery<{ method: string; count: number; total: number }[]>({
-    queryKey: ["/api/dashboard/payment-breakdown"],
-    queryFn: () => fetch("/api/dashboard/payment-breakdown", { credentials: "include" }).then(r => r.json()),
+    queryKey: ["/api/dashboard/payment-breakdown", period],
+    queryFn: () => fetch(`/api/dashboard/payment-breakdown?period=${period}`, { credentials: "include" }).then(r => r.json()),
   });
 
   const { data: weekly } = useQuery<{
@@ -74,6 +97,10 @@ export default function Dashboard() {
     queryKey: ["/api/dashboard/weekly-comparison"],
     queryFn: () => fetch("/api/dashboard/weekly-comparison", { credentials: "include" }).then(r => r.json()),
   });
+
+  // derived stats for selected period from chart data
+  const periodRevenue = chartData?.reduce((s, r) => s + r.revenue, 0) ?? 0;
+  const periodSales   = chartData?.reduce((s, r) => s + r.salesCount, 0) ?? 0;
 
   const pieData = paymentBreakdown?.map(p => ({
     name: METHOD_LABEL[p.method] ?? p.method,
@@ -86,9 +113,26 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-6" dir="rtl">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">لوحة القيادة</h1>
-        <p className="text-muted-foreground mt-1">نظرة عامة على أداء الصيدلية</p>
+
+      {/* ── Header + period selector ── */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">لوحة القيادة</h1>
+          <p className="text-muted-foreground mt-1">نظرة عامة على أداء الصيدلية</p>
+        </div>
+        <div className="flex gap-1 rounded-lg border bg-muted/40 p-1 w-fit self-start sm:self-auto">
+          {(["today", "week", "month", "year"] as Period[]).map(p => (
+            <Button
+              key={p}
+              variant={period === p ? "default" : "ghost"}
+              size="sm"
+              className="h-8 px-3 text-xs"
+              onClick={() => setPeriod(p)}
+            >
+              {PERIOD_LABELS[p]}
+            </Button>
+          ))}
+        </div>
       </div>
 
       {/* ── Stat cards ── */}
@@ -99,16 +143,17 @@ export default function Dashboard() {
       ) : summary && (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <StatCard
+            title={`إيرادات ${PERIOD_LABELS[period]}`}
+            value={`${periodRevenue.toFixed(2)} ج.م`}
+            sub={`${periodSales} فاتورة`}
+            icon={DollarSign} color="bg-primary"
+            trend={period === "week" ? weekly?.changePercent : undefined}
+            trendLabel={period === "week" ? "مقارنةً بالأسبوع الماضي" : undefined}
+          />
+          <StatCard
             title="إيرادات اليوم"
             value={`${summary.todayRevenue.toFixed(2)} ج.م`}
             sub={`${summary.todaySales} فاتورة اليوم`}
-            icon={DollarSign} color="bg-primary"
-            trend={weekly?.changePercent}
-            trendLabel="مقارنةً بالأسبوع الماضي"
-          />
-          <StatCard
-            title="إيرادات الشهر"
-            value={`${summary.monthRevenue.toFixed(2)} ج.م`}
             icon={TrendingUp} color="bg-green-500"
           />
           <StatCard
@@ -124,7 +169,7 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* ── Alert row ── */}
+      {/* ── Alert banners ── */}
       {summary && (summary.lowStockCount > 0 || summary.expiringSoonCount > 0) && (
         <div className="grid gap-4 sm:grid-cols-2">
           {summary.lowStockCount > 0 && (
@@ -166,12 +211,11 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* ── Main charts row ── */}
+      {/* ── Revenue area chart + payment pie ── */}
       <div className="grid gap-6 lg:grid-cols-7">
-        {/* Revenue area chart */}
         <Card className="lg:col-span-4">
           <CardHeader className="pb-2">
-            <CardTitle className="text-base">الإيرادات اليومية — آخر 30 يوم</CardTitle>
+            <CardTitle className="text-base">الإيرادات — {PERIOD_LABELS[period]}</CardTitle>
           </CardHeader>
           <CardContent>
             {chartData && chartData.length > 0 ? (
@@ -186,29 +230,29 @@ export default function Dashboard() {
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
                   <XAxis dataKey="date" tickLine={false} axisLine={false}
                     tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
-                    tickFormatter={fmtDate} interval="preserveStartEnd" />
+                    tickFormatter={d => fmtDateLabel(d, period)}
+                    interval="preserveStartEnd" />
                   <YAxis tickLine={false} axisLine={false}
                     tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
-                    tickFormatter={fmtMoney} width={70} />
+                    tickFormatter={fmtMoney} width={72} />
                   <Tooltip
                     contentStyle={{ backgroundColor: "hsl(var(--card))", borderColor: "hsl(var(--border))", borderRadius: 8, fontSize: 12 }}
                     formatter={(v: number) => [fmtMoney(v), "الإيراد"]}
-                    labelFormatter={fmtDate}
+                    labelFormatter={d => fmtDateLabel(d, period)}
                   />
                   <Area type="monotone" dataKey="revenue" stroke="hsl(var(--primary))" strokeWidth={2}
                     fillOpacity={1} fill="url(#gradRevenue)" dot={false} activeDot={{ r: 4 }} />
                 </AreaChart>
               </ResponsiveContainer>
             ) : (
-              <div className="h-[260px] flex items-center justify-center text-muted-foreground text-sm">لا توجد بيانات بعد</div>
+              <div className="h-[260px] flex items-center justify-center text-muted-foreground text-sm">لا توجد بيانات لهذه الفترة</div>
             )}
           </CardContent>
         </Card>
 
-        {/* Payment breakdown pie */}
         <Card className="lg:col-span-3">
           <CardHeader className="pb-2">
-            <CardTitle className="text-base">طرق الدفع — آخر 30 يوم</CardTitle>
+            <CardTitle className="text-base">طرق الدفع — {PERIOD_LABELS[period]}</CardTitle>
           </CardHeader>
           <CardContent>
             {pieData.length > 0 ? (
@@ -244,18 +288,17 @@ export default function Dashboard() {
                 </div>
               </div>
             ) : (
-              <div className="h-[200px] flex items-center justify-center text-muted-foreground text-sm">لا توجد مبيعات بعد</div>
+              <div className="h-[200px] flex items-center justify-center text-muted-foreground text-sm">لا توجد مبيعات في هذه الفترة</div>
             )}
           </CardContent>
         </Card>
       </div>
 
-      {/* ── Second row: daily bar chart + top medicines ── */}
+      {/* ── Daily sales bar + top medicines ── */}
       <div className="grid gap-6 lg:grid-cols-7">
-        {/* Daily sales count bar chart */}
         <Card className="lg:col-span-4">
           <CardHeader className="pb-2">
-            <CardTitle className="text-base">عدد الفواتير اليومية — آخر 30 يوم</CardTitle>
+            <CardTitle className="text-base">عدد الفواتير — {PERIOD_LABELS[period]}</CardTitle>
           </CardHeader>
           <CardContent>
             {chartData && chartData.length > 0 ? (
@@ -264,28 +307,28 @@ export default function Dashboard() {
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
                   <XAxis dataKey="date" tickLine={false} axisLine={false}
                     tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
-                    tickFormatter={fmtDate} interval="preserveStartEnd" />
+                    tickFormatter={d => fmtDateLabel(d, period)}
+                    interval="preserveStartEnd" />
                   <YAxis tickLine={false} axisLine={false}
                     tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
                     allowDecimals={false} width={30} />
                   <Tooltip
                     contentStyle={{ backgroundColor: "hsl(var(--card))", borderColor: "hsl(var(--border))", borderRadius: 8, fontSize: 12 }}
                     formatter={(v: number) => [v, "فاتورة"]}
-                    labelFormatter={fmtDate}
+                    labelFormatter={d => fmtDateLabel(d, period)}
                   />
                   <Bar dataKey="salesCount" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} maxBarSize={30} />
                 </BarChart>
               </ResponsiveContainer>
             ) : (
-              <div className="h-[220px] flex items-center justify-center text-muted-foreground text-sm">لا توجد بيانات بعد</div>
+              <div className="h-[220px] flex items-center justify-center text-muted-foreground text-sm">لا توجد بيانات لهذه الفترة</div>
             )}
           </CardContent>
         </Card>
 
-        {/* Top medicines */}
         <Card className="lg:col-span-3">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-base">أفضل الأدوية مبيعاً</CardTitle>
+            <CardTitle className="text-base">أفضل الأدوية — {PERIOD_LABELS[period]}</CardTitle>
             <Link href="/reports" className="flex items-center gap-1 text-xs text-primary hover:underline">
               التقارير <ArrowLeft className="h-3 w-3" />
             </Link>
@@ -305,13 +348,13 @@ export default function Dashboard() {
                 </div>
                 <div className="h-1.5 bg-muted rounded-full overflow-hidden">
                   <div
-                    className="h-full bg-primary rounded-full transition-all"
+                    className="h-full bg-primary rounded-full transition-all duration-500"
                     style={{ width: `${(med.totalRevenue / maxRevenue) * 100}%` }}
                   />
                 </div>
               </div>
             )) : (
-              <div className="h-40 flex items-center justify-center text-muted-foreground text-sm">لا توجد مبيعات بعد</div>
+              <div className="h-40 flex items-center justify-center text-muted-foreground text-sm">لا توجد مبيعات في هذه الفترة</div>
             )}
           </CardContent>
         </Card>

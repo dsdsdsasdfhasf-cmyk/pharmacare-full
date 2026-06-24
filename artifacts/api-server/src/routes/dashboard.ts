@@ -5,6 +5,23 @@ import { eq, gte, sql, lte, and } from "drizzle-orm";
 
 const router = Router();
 
+type Period = "today" | "week" | "month" | "year";
+
+function getPeriodStart(period: Period): Date {
+  const d = new Date();
+  if (period === "today") { d.setHours(0, 0, 0, 0); return d; }
+  if (period === "week")  { d.setDate(d.getDate() - 7); return d; }
+  if (period === "year")  { d.setFullYear(d.getFullYear() - 1); return d; }
+  // month (default)
+  d.setDate(d.getDate() - 30);
+  return d;
+}
+
+function parsePeriod(raw: unknown): Period {
+  if (raw === "today" || raw === "week" || raw === "month" || raw === "year") return raw;
+  return "month";
+}
+
 router.get("/dashboard/summary", async (_req, res) => {
   const todayStart = new Date();
   todayStart.setHours(0, 0, 0, 0);
@@ -50,20 +67,34 @@ router.get("/dashboard/summary", async (_req, res) => {
   });
 });
 
-router.get("/dashboard/sales-chart", async (_req, res) => {
-  const thirtyDaysAgo = new Date();
-  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+router.get("/dashboard/sales-chart", async (req, res) => {
+  const period = parsePeriod(req.query.period);
+  const since = getPeriodStart(period);
 
-  const rows = await db
-    .select({
-      date: sql<string>`date(created_at)::text`,
-      revenue: sql<number>`coalesce(sum(total_amount), 0)`,
-      salesCount: sql<number>`count(*)::int`,
-    })
-    .from(salesTable)
-    .where(gte(salesTable.createdAt, thirtyDaysAgo))
-    .groupBy(sql`date(created_at)`)
-    .orderBy(sql`date(created_at)`);
+  let rows;
+  if (period === "today") {
+    rows = await db
+      .select({
+        date: sql<string>`to_char(created_at, 'HH24:00')`,
+        revenue: sql<number>`coalesce(sum(total_amount), 0)`,
+        salesCount: sql<number>`count(*)::int`,
+      })
+      .from(salesTable)
+      .where(and(gte(salesTable.createdAt, since), eq(salesTable.status, "completed")))
+      .groupBy(sql`to_char(created_at, 'HH24:00')`)
+      .orderBy(sql`to_char(created_at, 'HH24:00')`);
+  } else {
+    rows = await db
+      .select({
+        date: sql<string>`date(created_at)::text`,
+        revenue: sql<number>`coalesce(sum(total_amount), 0)`,
+        salesCount: sql<number>`count(*)::int`,
+      })
+      .from(salesTable)
+      .where(and(gte(salesTable.createdAt, since), eq(salesTable.status, "completed")))
+      .groupBy(sql`date(created_at)`)
+      .orderBy(sql`date(created_at)`);
+  }
 
   res.json(rows.map(r => ({
     date: r.date,
@@ -72,7 +103,10 @@ router.get("/dashboard/sales-chart", async (_req, res) => {
   })));
 });
 
-router.get("/dashboard/top-medicines", async (_req, res) => {
+router.get("/dashboard/top-medicines", async (req, res) => {
+  const period = parsePeriod(req.query.period);
+  const since = getPeriodStart(period);
+
   const rows = await db
     .select({
       medicineId: saleItemsTable.medicineId,
@@ -81,7 +115,9 @@ router.get("/dashboard/top-medicines", async (_req, res) => {
       totalRevenue: sql<number>`sum(${saleItemsTable.totalPrice})`,
     })
     .from(saleItemsTable)
+    .leftJoin(salesTable, eq(saleItemsTable.saleId, salesTable.id))
     .leftJoin(medicinesTable, eq(saleItemsTable.medicineId, medicinesTable.id))
+    .where(gte(salesTable.createdAt, since))
     .groupBy(saleItemsTable.medicineId, medicinesTable.name)
     .orderBy(sql`sum(${saleItemsTable.totalPrice}) DESC`)
     .limit(10);
@@ -154,9 +190,9 @@ router.get("/dashboard/low-stock", async (_req, res) => {
   })));
 });
 
-router.get("/dashboard/payment-breakdown", async (_req, res) => {
-  const thirtyDaysAgo = new Date();
-  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+router.get("/dashboard/payment-breakdown", async (req, res) => {
+  const period = parsePeriod(req.query.period);
+  const since = getPeriodStart(period);
 
   const rows = await db
     .select({
@@ -165,7 +201,7 @@ router.get("/dashboard/payment-breakdown", async (_req, res) => {
       total: sql<number>`coalesce(sum(total_amount), 0)`,
     })
     .from(salesTable)
-    .where(and(gte(salesTable.createdAt, thirtyDaysAgo), eq(salesTable.status, "completed")))
+    .where(and(gte(salesTable.createdAt, since), eq(salesTable.status, "completed")))
     .groupBy(salesTable.paymentMethod);
 
   res.json(rows.map(r => ({
