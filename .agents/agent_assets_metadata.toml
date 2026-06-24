@@ -1,0 +1,8 @@
+uploads = []
+generated = []
+
+[[outputs]]
+id = "bCmq1cQ1jkat4fs8SvVSf"
+uri = "file://pharmacare-full.tar.gz"
+type = "unspecified"
+title = "PharmaCare — المشروع الكامل (.tar.gz)"
