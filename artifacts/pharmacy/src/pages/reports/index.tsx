@@ -7,8 +7,9 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { TrendingUp, TrendingDown, DollarSign, Package, AlertTriangle, Search, Download } from "lucide-react";
+import { TrendingUp, TrendingDown, DollarSign, Package, AlertTriangle, Search, Download, FileDown } from "lucide-react";
 import { useListMedicines } from "@workspace/api-client-react";
+import { exportProfitLossPDF, exportExpiringPDF } from "@/lib/pdf-export";
 
 interface ProfitLoss {
   totalRevenue: number;
@@ -156,12 +157,20 @@ export default function Reports() {
 
           {profitByMedicine && profitByMedicine.length > 0 && (
             <Card>
-              <CardHeader className="flex flex-row items-center justify-between">
+              <CardHeader className="flex flex-row items-center justify-between flex-wrap gap-2">
                 <CardTitle>الأرباح حسب الدواء (أعلى 20)</CardTitle>
-                <Button size="sm" variant="outline" onClick={() => exportCSV(profitByMedicine as unknown as Record<string, unknown>[], "profit-by-medicine.csv")}>
-                  <Download className="h-4 w-4 ml-1" />
-                  تصدير CSV
-                </Button>
+                <div className="flex gap-2 flex-wrap">
+                  {profitLoss && (
+                    <Button size="sm" variant="default" onClick={() => exportProfitLossPDF(profitLoss, profitByMedicine ?? [], period)}>
+                      <FileDown className="h-4 w-4 ml-1" />
+                      PDF
+                    </Button>
+                  )}
+                  <Button size="sm" variant="outline" onClick={() => exportCSV(profitByMedicine as unknown as Record<string, unknown>[], "profit-by-medicine.csv")}>
+                    <Download className="h-4 w-4 ml-1" />
+                    CSV
+                  </Button>
+                </div>
               </CardHeader>
               <CardContent className="p-0">
                 <Table>
@@ -215,9 +224,15 @@ export default function Reports() {
               </SelectContent>
             </Select>
             {expiring && (
+              <Button size="sm" variant="default" onClick={() => exportExpiringPDF(expiring, expiryDays)}>
+                <FileDown className="h-4 w-4 ml-1" />
+                PDF
+              </Button>
+            )}
+            {expiring && (
               <Button size="sm" variant="outline" onClick={() => exportCSV(expiring as unknown as Record<string, unknown>[], "expiring-medicines.csv")}>
                 <Download className="h-4 w-4 ml-1" />
-                تصدير CSV
+                CSV
               </Button>
             )}
             {expiring && (
