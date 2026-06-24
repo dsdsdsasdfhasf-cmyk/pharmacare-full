@@ -5,7 +5,8 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Search, ShoppingCart, Trash2, CreditCard, Banknote, Shield, User, Scan, X, Printer } from "lucide-react";
+import { Search, ShoppingCart, Trash2, CreditCard, Banknote, Shield, User, Scan, X, Printer, Camera } from "lucide-react";
+import { CameraScanner } from "@/components/camera-scanner";
 import {
   useListMedicines, useListCustomers, useCreateSale,
   getListSalesQueryKey, getGetDashboardSummaryQueryKey, getGetRecentSalesQueryKey,
@@ -28,6 +29,7 @@ export default function POS() {
   const [discount, setDiscount] = useState(0);
   const [customerId, setCustomerId] = useState<string>("");
   const [showScanner, setShowScanner] = useState(false);
+  const [scanMode, setScanMode] = useState<"keyboard" | "camera">("keyboard");
   const [receipt, setReceipt] = useState<ReceiptData | null>(null);
   const barcodeRef = useRef<HTMLInputElement>(null);
 
@@ -158,24 +160,54 @@ export default function POS() {
           {showScanner && (
             <Card className="border-primary/50 bg-primary/5">
               <CardContent className="p-3 space-y-2">
-                <div className="flex items-center gap-2 text-sm font-medium text-primary">
-                  <Scan className="h-4 w-4" />
-                  <span>وضع مسح الباركود — اكتب أو امسح الباركود ثم اضغط Enter</span>
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2 text-sm font-medium text-primary">
+                    <Scan className="h-4 w-4" />
+                    <span>مسح الباركود</span>
+                  </div>
+                  <div className="flex gap-1 border rounded-md p-0.5 bg-background">
+                    <Button
+                      size="sm"
+                      variant={scanMode === "keyboard" ? "default" : "ghost"}
+                      className="h-7 text-xs gap-1 px-2"
+                      onClick={() => setScanMode("keyboard")}
+                    >
+                      <Scan className="h-3 w-3" />
+                      ماسح / يدوي
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant={scanMode === "camera" ? "default" : "ghost"}
+                      className="h-7 text-xs gap-1 px-2"
+                      onClick={() => setScanMode("camera")}
+                    >
+                      <Camera className="h-3 w-3" />
+                      كاميرا
+                    </Button>
+                  </div>
                 </div>
-                <div className="flex gap-2">
-                  <Input
-                    ref={barcodeRef}
-                    value={barcodeInput}
-                    onChange={(e) => setBarcodeInput(e.target.value)}
-                    onKeyDown={(e) => { if (e.key === "Enter") handleBarcodeSearch(barcodeInput); }}
-                    placeholder="6223000001"
-                    className="h-10 font-mono"
-                    data-testid="input-barcode"
+
+                {scanMode === "keyboard" ? (
+                  <div className="flex gap-2">
+                    <Input
+                      ref={barcodeRef}
+                      value={barcodeInput}
+                      onChange={(e) => setBarcodeInput(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === "Enter") handleBarcodeSearch(barcodeInput); }}
+                      placeholder="6223000001 — اكتب أو امسح ثم Enter"
+                      className="h-10 font-mono"
+                      data-testid="input-barcode"
+                    />
+                    <Button onClick={() => handleBarcodeSearch(barcodeInput)} disabled={!barcodeInput.trim()} data-testid="button-barcode-search">
+                      إضافة
+                    </Button>
+                  </div>
+                ) : (
+                  <CameraScanner
+                    onResult={(barcode) => handleBarcodeSearch(barcode)}
+                    onError={(msg) => toast({ title: `خطأ في الكاميرا: ${msg}`, variant: "destructive" })}
                   />
-                  <Button onClick={() => handleBarcodeSearch(barcodeInput)} disabled={!barcodeInput.trim()} data-testid="button-barcode-search">
-                    إضافة
-                  </Button>
-                </div>
+                )}
               </CardContent>
             </Card>
           )}

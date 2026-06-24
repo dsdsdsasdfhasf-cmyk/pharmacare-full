@@ -175,3 +175,13 @@
     @apply font-sans antialiased bg-background text-foreground;
   }
 }
+
+@keyframes scan {
+  0% { top: 20%; }
+  50% { top: 78%; }
+  100% { top: 20%; }
+}
+.animate-scan {
+  animation: scan 2s ease-in-out infinite;
+  position: absolute;
+}
