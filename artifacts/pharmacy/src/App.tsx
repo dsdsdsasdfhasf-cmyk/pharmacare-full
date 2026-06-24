@@ -19,6 +19,7 @@ import Categories from "@/pages/categories/index";
 import Reports from "@/pages/reports/index";
 import Alerts from "@/pages/alerts/index";
 import UsersPage from "@/pages/users/index";
+import Settings from "@/pages/settings/index";
 import LoginPage from "@/pages/auth/login";
 
 const queryClient = new QueryClient({
@@ -66,6 +67,7 @@ function ProtectedRoutes() {
         {isAdmin && <Route path="/reports" component={Reports} />}
         <Route path="/alerts" component={Alerts} />
         {isAdmin && <Route path="/users" component={UsersPage} />}
+        {isAdmin && <Route path="/settings" component={Settings} />}
         <Route>
           {isAdmin ? <NotFound /> : <Redirect to="/" />}
         </Route>

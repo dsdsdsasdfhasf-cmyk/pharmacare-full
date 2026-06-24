@@ -3,7 +3,7 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
   LayoutDashboard, Pill, ShoppingCart, Truck, Users, UserSquare,
-  FileText, Tags, Menu, Stethoscope, BarChart2, Bell, LogOut, ChevronDown, AlertTriangle, BellRing, UserCog
+  FileText, Tags, Menu, Stethoscope, BarChart2, Bell, LogOut, ChevronDown, AlertTriangle, BellRing, UserCog, Settings
 } from "lucide-react";
 import { Button } from "./ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "./ui/sheet";
@@ -29,6 +29,7 @@ const ADMIN_NAV = [
   { href: "/reports", label: "التقارير", icon: BarChart2 },
   { href: "/alerts", label: "تنبيهات المخزون", icon: BellRing },
   { href: "/users", label: "المستخدمون", icon: UserCog },
+  { href: "/settings", label: "الإعدادات والنسخ الاحتياطي", icon: Settings },
 ];
 
 const PHARMACIST_NAV = [

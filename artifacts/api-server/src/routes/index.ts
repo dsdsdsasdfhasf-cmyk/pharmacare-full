@@ -11,6 +11,7 @@ import dashboardRouter from "./dashboard";
 import reportsRouter from "./reports";
 import authRouter from "./auth";
 import usersRouter from "./users";
+import backupRouter from "./backup";
 
 const router: IRouter = Router();
 
@@ -26,5 +27,6 @@ router.use(salesRouter);
 router.use(purchasesRouter);
 router.use(dashboardRouter);
 router.use(reportsRouter);
+router.use(backupRouter);
 
 export default router;
