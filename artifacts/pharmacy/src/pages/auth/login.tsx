@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Pill, Lock, User, AlertCircle } from "lucide-react";
+import { Pill, Lock, User, AlertCircle, Eye, EyeOff } from "lucide-react";
 
 export default function LoginPage() {
   const { login } = useAuth();
@@ -12,6 +12,7 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -66,10 +67,18 @@ export default function LoginPage() {
                 <Label htmlFor="password">كلمة المرور</Label>
                 <div className="relative">
                   <Lock className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(v => !v)}
+                    className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                    aria-label={showPassword ? "إخفاء كلمة المرور" : "إظهار كلمة المرور"}
+                  >
+                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
                   <Input
                     id="password"
-                    type="password"
-                    className="pr-9 text-right"
+                    type={showPassword ? "text" : "password"}
+                    className="pr-9 pl-9 text-right"
                     placeholder="••••••••"
                     value={password}
                     onChange={e => setPassword(e.target.value)}
@@ -77,6 +86,17 @@ export default function LoginPage() {
                     autoComplete="current-password"
                   />
                 </div>
+              </div>
+
+              <div
+                className="rounded-md border border-dashed border-primary/40 bg-primary/5 p-3 text-sm text-muted-foreground cursor-pointer hover:bg-primary/10 transition-colors"
+                onClick={() => { setUsername("admin@pharmacare.app"); setPassword("PharmaCare2024!Demo"); }}
+                title="انقر لملء بيانات التجربة"
+              >
+                <p className="font-medium text-primary mb-1">بيانات تجريبية (انقر للملء)</p>
+                <p>البريد الإلكتروني: <span className="font-mono text-gray-700">admin@pharmacare.app</span></p>
+                <p>كلمة المرور: <span className="font-mono text-gray-700">PharmaCare2024!Demo</span></p>
+                <p className="mt-1 text-xs">أو الصيدلي: <span className="font-mono text-gray-700">pharmacist@pharmacare.app</span> / <span className="font-mono text-gray-700">PharmaCare2024!Staff</span></p>
               </div>
 
               {error && (

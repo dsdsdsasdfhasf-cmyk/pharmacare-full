@@ -1,0 +1,33 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": null,
+  "buildCommand": "pnpm install --config.confirmModulesPurge=false && pnpm --filter @workspace/api-server run build && pnpm --filter @workspace/pharmacy run build",
+  "outputDirectory": "artifacts/pharmacy/dist/public",
+  "rewrites": [
+    { "source": "/api/(.*)", "destination": "/api/index" },
+    { "source": "/((?!api/).*)", "destination": "/index.html" }
+  ],
+  "headers": [
+    {
+      "source": "/assets/(.*)",
+      "headers": [
+        { "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }
+      ]
+    }
+  ],
+  "functions": {
+    "api/index.mjs": {
+      "maxDuration": 30,
+      "runtime": "nodejs22.x"
+    }
+  },
+  "env": {
+    "SESSION_SECRET": "@pharmacare-session-secret",
+    "ADMIN_EMAIL": "@pharmacare-admin-email",
+    "ADMIN_PASSWORD": "@pharmacare-admin-password",
+    "PHARMACIST_EMAIL": "@pharmacare-pharmacist-email",
+    "PHARMACIST_PASSWORD": "@pharmacare-pharmacist-password",
+    "SEED_SAMPLE_DATA": "true",
+    "VERCEL": "1"
+  }
+}

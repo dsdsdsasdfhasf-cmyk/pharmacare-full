@@ -41,7 +41,7 @@
 
 ## Product
 
-- **Login** — admin/admin123 · pharmacist/pharma123
+- **Login** — admin@pharmacare.app / PharmaCare2024!Demo · pharmacist@pharmacare.app / PharmaCare2024!Staff (override via ADMIN_EMAIL/ADMIN_PASSWORD/PHARMACIST_EMAIL/PHARMACIST_PASSWORD env vars)
 - **Dashboard** — revenue stats, low-stock alerts, top medicines, recent sales
 - **POS** — barcode scanner support, cart, receipt printing after checkout
 - **Medicines** — full CRUD + category/supplier links + expiry tracking
