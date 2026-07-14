@@ -25,22 +25,28 @@ The login page shows these and lets you click to auto-fill.
 
 Env overrides: `ADMIN_EMAIL`, `ADMIN_PASSWORD`, `PHARMACIST_EMAIL`, `PHARMACIST_PASSWORD`, `SESSION_SECRET`.
 
-## Vercel deployment
+## Vercel deployment (frontend-only demo)
 
-A root `vercel.json` is configured to:
+`vercel.json` is configured to deploy the frontend as a static SPA with demo mode on — no backend required:
 
 1. Install deps with pnpm.
-2. Build the API serverless bundle (`artifacts/api-server/dist/serverless.mjs`).
-3. Build the frontend (`artifacts/pharmacy/dist/public`).
-4. Serve the SPA and route `/api/*` to the serverless function in `api/index.mjs`.
+2. Build the frontend only (`artifacts/pharmacy/dist/public`).
+3. Serve the SPA (all routes rewrite to `index.html`) with the bundled demo data.
 
-Set these in the Vercel project (or via `vercel env`):
+Required project environment variable (already set to `true` in `vercel.json`):
 
-- `SESSION_SECRET` (required, any random string)
-- `ADMIN_EMAIL` / `ADMIN_PASSWORD`
-- `PHARMACIST_EMAIL` / `PHARMACIST_PASSWORD`
-- `SEED_SAMPLE_DATA=true` (default)
-- `VERCEL=1` (set automatically by Vercel)
+- `VITE_DEMO_MODE=true`
+
+To deploy:
+
+```pwsh
+# install the CLI (one time)
+npm i -g vercel
+# login (opens browser), then:
+vercel --prod
+```
+
+The demo interceptor handles all `/api/*` calls in the browser, so no serverless function is needed.
 
 ### Important: database persistence
 
@@ -50,9 +56,16 @@ This app uses **SQLite via `better-sqlite3`**. On Vercel:
 - The app **self-seeds** tables + demo users + sample data on boot, so the UI is always populated, but **writes are not persisted** across invocations.
 - For a real persistent deployment, migrate to **PostgreSQL** (e.g. Neon) and point `DATABASE_URL` at it.
 
-### Demo mode (frontend only)
+### Demo mode (frontend only) — recommended for Vercel
 
-The frontend includes an optional offline demo interceptor, disabled by default. Enable it with `VITE_DEMO_MODE=true` if you want the UI usable without a backend.
+The frontend includes an offline demo interceptor that simulates the entire backend in the browser. It is **enabled by default** (`main.tsx` installs it unless `VITE_DEMO_MODE` is set to `"false"`). All sample data (medicines, categories, suppliers, customers, sales, purchases) is bundled in `artifacts/pharmacy/src/demo-api.ts`, so the app is fully usable with **no backend at all**.
+
+Notes:
+- Demo data is in-memory; edits reset on page reload.
+- The demo login accepts the credentials below for any password and always logs in as admin.
+- Credentials shown on the login page and auto-filled on click:
+  - `admin@pharmacare.app` / `PharmaCare2024!Demo`
+  - `pharmacist@pharmacare.app` / `PharmaCare2024!Staff`
 
 ## Resetting local data
 
