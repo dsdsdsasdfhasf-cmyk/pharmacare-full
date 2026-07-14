@@ -4,6 +4,11 @@
 
 const demoUser = { id: 1, username: "admin@pharmacare.app", name: "مدير العرض التجريبي", role: "admin" as const };
 
+const users = [
+  { id: 1, username: "admin@pharmacare.app", name: "مدير العرض التجريبي", role: "admin", createdAt: "2024-01-01T00:00:00.000Z" },
+  { id: 2, username: "pharmacist@pharmacare.app", name: "صيدلي العرض التجريبي", role: "pharmacist", createdAt: "2024-01-01T00:00:00.000Z" },
+];
+
 const categories = [
   { id: 1, name: "مضادات حيوية", description: "Antibiotics", createdAt: "2024-01-01T00:00:00.000Z" },
   { id: 2, name: "مسكنات ألم", description: "Pain relievers", createdAt: "2024-01-01T00:00:00.000Z" },
@@ -98,7 +103,8 @@ export function installDemoApi() {
     if (path === "/api/auth/login") {
       return json({ ...demoUser, username: "admin@pharmacare.app" });
     }
-    if (path === "/api/auth/me") return json(demoUser);
+    // No session by default: the visitor must log in with the demo credentials.
+    if (path === "/api/auth/me") return json({ error: "Not authenticated" }, 401);
     if (path === "/api/auth/logout") return json({ success: true });
 
     // --- Medicines ---
@@ -246,6 +252,29 @@ export function installDemoApi() {
     if (path === "/api/reports/expiring") {
       const soon = medicines.filter(m => m.expiryDate && m.expiryDate <= "2027-12-31").map(m => ({ id: m.id, name: m.name, genericName: m.genericName, quantity: m.quantity, expiryDate: m.expiryDate, sellingPrice: m.sellingPrice, purchasePrice: m.purchasePrice, potentialLoss: m.purchasePrice * m.quantity }));
       return json(soon);
+    }
+
+    // --- Users ---
+    if (path === "/api/users" && method === "GET") return json(users);
+    if (path === "/api/users" && method === "POST") {
+      const b = JSON.parse(init?.body as string);
+      const u = { id: users.length + 1, username: b.username, name: b.name, role: b.role || "pharmacist", createdAt: new Date().toISOString() };
+      users.push(u);
+      return json(u, 201);
+    }
+    if (path.startsWith("/api/users/") && method === "PATCH") {
+      const id = Number(path.split("/")[3]);
+      const u = users.find(x => x.id === id);
+      if (!u) return json({ error: "User not found" }, 404);
+      const b = JSON.parse(init?.body as string);
+      Object.assign(u, b);
+      return json(u);
+    }
+    if (path.startsWith("/api/users/") && method === "DELETE") {
+      const id = Number(path.split("/")[3]);
+      const i = users.findIndex(x => x.id === id);
+      if (i >= 0) users.splice(i, 1);
+      return new Response(null, { status: 204 });
     }
 
     // --- Backup ---
