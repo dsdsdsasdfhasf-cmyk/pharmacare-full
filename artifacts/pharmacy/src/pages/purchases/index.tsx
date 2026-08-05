@@ -75,7 +75,7 @@ function PurchaseDetailDialog({ purchaseId, onClose }: { purchaseId: number | nu
                   <TableRow><TableHead>الدواء</TableHead><TableHead className="text-center">الكمية</TableHead><TableHead className="text-right">سعر الوحدة</TableHead><TableHead className="text-right">الإجمالي</TableHead></TableRow>
                 </TableHeader>
                 <TableBody>
-                  {purchase.items.map((item) => (
+                  {purchase.items.map((item: any) => (
                     <TableRow key={item.id}>
                       <TableCell className="font-medium">{item.medicineName}</TableCell>
                       <TableCell className="text-center">{item.quantity}</TableCell>
@@ -100,7 +100,7 @@ export default function Purchases() {
   const { data: purchases, isLoading } = useListPurchases();
   const [viewId, setViewId] = useState<number | null>(null);
 
-  const totalSpent = purchases?.reduce((sum, p) => sum + p.totalAmount, 0) ?? 0;
+  const totalSpent = purchases?.reduce((sum: any, p: any) => sum + p.totalAmount, 0) ?? 0;
 
   return (
     <div className="space-y-6">
@@ -141,7 +141,7 @@ export default function Purchases() {
               ) : !purchases?.length ? (
                 <TableRow><TableCell colSpan={8} className="h-24 text-center text-muted-foreground">لا توجد أوامر شراء.</TableCell></TableRow>
               ) : (
-                purchases.map((p) => (
+                purchases.map((p: any) => (
                   <TableRow key={p.id} data-testid={`row-purchase-${p.id}`} className={p.status === "cancelled" ? "opacity-60" : ""}>
                     <TableCell className="font-mono text-muted-foreground">#{p.id}</TableCell>
                     <TableCell className="font-medium">{p.supplierName}</TableCell>

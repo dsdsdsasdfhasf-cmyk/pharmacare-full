@@ -76,7 +76,7 @@ export default function NewPurchase() {
           <Label>المورد *</Label>
           <Select value={supplierId} onValueChange={setSupplierId}>
             <SelectTrigger data-testid="select-purchase-supplier"><SelectValue placeholder="اختر المورد" /></SelectTrigger>
-            <SelectContent>{suppliers?.map(s => <SelectItem key={s.id} value={String(s.id)}>{s.name}</SelectItem>)}</SelectContent>
+            <SelectContent>{suppliers?.map((s: any) => <SelectItem key={s.id} value={String(s.id)}>{s.name}</SelectItem>)}</SelectContent>
           </Select>
         </div>
         <div className="space-y-1">
@@ -98,7 +98,7 @@ export default function NewPurchase() {
           </div>
           {medSearch && medicines && medicines.length > 0 && (
             <div className="border rounded-lg overflow-hidden">
-              {medicines.slice(0, 6).map(m => (
+              {medicines.slice(0, 6).map((m: any) => (
                 <button key={m.id} onClick={() => addMedicine(m)} className="w-full flex items-center justify-between px-4 py-2 hover:bg-muted text-left border-b last:border-0" data-testid={`button-add-medicine-purchase-${m.id}`}>
                   <div><span className="font-medium">{m.name}</span><span className="text-sm text-muted-foreground ml-2">{m.genericName}</span></div>
                   <div className="text-sm text-primary font-medium">{m.purchasePrice.toFixed(2)} ج.م</div>

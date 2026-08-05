@@ -10,6 +10,7 @@ import { CameraScanner } from "@/components/camera-scanner";
 import {
   useListMedicines, useListCustomers, useCreateSale,
   getListSalesQueryKey, getGetDashboardSummaryQueryKey, getGetRecentSalesQueryKey,
+  listMedicines,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
@@ -58,14 +59,20 @@ export default function POS() {
     setSearchTerm("");
   }
 
-  function handleBarcodeSearch(barcode: string) {
-    if (!barcode.trim() || !medicines) return;
-    const found = medicines.find(m => m.barcode === barcode.trim());
-    if (found) {
-      addToCart(found as Medicine);
-      setBarcodeInput("");
-    } else {
-      toast({ title: `لم يُعثر على دواء بالباركود: ${barcode}`, variant: "destructive" });
+  async function handleBarcodeSearch(barcode: string) {
+    if (!barcode.trim()) return;
+    try {
+      const results = await listMedicines({ search: barcode.trim() });
+      const found = results.find(m => m.barcode === barcode.trim());
+      if (found) {
+        addToCart(found as Medicine);
+        setBarcodeInput("");
+      } else {
+        toast({ title: `لم يُعثر على دواء بالباركود: ${barcode}`, variant: "destructive" });
+        setBarcodeInput("");
+      }
+    } catch (error) {
+      toast({ title: "خطأ أثناء البحث عن الباركود", variant: "destructive" });
       setBarcodeInput("");
     }
   }
@@ -86,7 +93,7 @@ export default function POS() {
 
   function handleCheckout() {
     if (cart.length === 0) return;
-    const selectedCustomer = customers?.find(c => String(c.id) === customerId);
+    const selectedCustomer = customers?.find((c: any) => String(c.id) === customerId);
     createSale.mutate({
       data: {
         items: cart.map(i => ({ medicineId: i.id, quantity: i.cartQuantity, unitPrice: i.sellingPrice })),
@@ -95,7 +102,7 @@ export default function POS() {
         customerId: customerId && customerId !== "none" ? Number(customerId) : undefined,
       }
     }, {
-      onSuccess: (sale) => {
+      onSuccess: (sale: any) => {
         queryClient.invalidateQueries({ queryKey: getListSalesQueryKey() });
         queryClient.invalidateQueries({ queryKey: getGetDashboardSummaryQueryKey() });
         queryClient.invalidateQueries({ queryKey: getGetRecentSalesQueryKey() });
@@ -105,7 +112,7 @@ export default function POS() {
           createdAt: sale.createdAt,
           paymentMethod: sale.paymentMethod,
           customerName: selectedCustomer?.name ?? sale.customerName ?? null,
-          items: sale.items.map(i => ({
+          items: sale.items.map((i: any) => ({
             medicineName: i.medicineName,
             quantity: i.quantity,
             unitPrice: i.unitPrice,
@@ -213,7 +220,7 @@ export default function POS() {
           )}
 
           <div className="flex-1 overflow-y-auto grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 pb-2 content-start">
-            {displayMedicines?.map(med => {
+            {displayMedicines?.map((med: any) => {
               const inCart = cart.find(i => i.id === med.id);
               const outOfStock = med.quantity <= 0;
               return (
@@ -304,7 +311,7 @@ export default function POS() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="none">بدون عميل</SelectItem>
-                  {customers?.map(c => (
+                  {customers?.map((c: any) => (
                     <SelectItem key={c.id} value={String(c.id)}>{c.name}{c.phone ? ` — ${c.phone}` : ""}</SelectItem>
                   ))}
                 </SelectContent>

@@ -96,7 +96,7 @@ export default function Suppliers() {
             <TableBody>
               {isLoading ? <TableRow><TableCell colSpan={6} className="h-24 text-center">جاري التحميل...</TableCell></TableRow>
                 : !suppliers?.length ? <TableRow><TableCell colSpan={6} className="h-24 text-center text-muted-foreground">لا يوجد موردون.</TableCell></TableRow>
-                : suppliers.map((s) => (
+                : suppliers.map((s: any) => (
                   <TableRow key={s.id} data-testid={`row-supplier-${s.id}`}>
                     <TableCell><div className="flex items-center gap-2"><Building2 className="h-4 w-4 text-muted-foreground shrink-0" /><span className="font-medium">{s.name}</span></div></TableCell>
                     <TableCell>{s.contactPerson || "—"}</TableCell>

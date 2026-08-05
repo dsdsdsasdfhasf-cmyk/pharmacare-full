@@ -4,10 +4,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Link } from "wouter";
-import { useGetDashboardSummary, useGetLowStockAlerts } from "@workspace/api-client-react";
+import { useGetDashboardSummary, useGetLowStockAlerts, useListSales } from "@workspace/api-client-react";
 import {
-  AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell,
+  AreaChart, Area, BarChart, Bar,
   ResponsiveContainer, Tooltip, XAxis, YAxis, CartesianGrid,
+  PieChart, Pie, Cell,
 } from "recharts";
 import {
   TrendingUp, Pill, AlertTriangle, Clock,
@@ -23,11 +24,21 @@ const PERIOD_LABELS: Record<Period, string> = {
   year: "السنة",
 };
 
-const METHOD_LABEL: Record<string, string> = { cash: "نقدي", card: "بطاقة", insurance: "تأمين" };
-const METHOD_COLOR: Record<string, string> = { cash: "#14b8a6", card: "#6366f1", insurance: "#f59e0b" };
-const PIE_COLORS = ["#14b8a6", "#6366f1", "#f59e0b", "#ef4444"];
-
 function fmtMoney(v: number) { return `${v.toFixed(0)} ج.م`; }
+
+const CustomTooltip = ({ active, payload, label, fmt }: any) => {
+  if (active && payload && payload.length) {
+    return (
+      <div className="bg-background/95 backdrop-blur border rounded-xl p-3 shadow-md flex flex-col gap-1 text-right text-xs">
+        <p className="font-semibold text-muted-foreground">{label}</p>
+        <p className="text-sm font-bold text-primary">
+          {fmt(payload[0].value)}
+        </p>
+      </div>
+    );
+  }
+  return null;
+};
 
 function fmtDateLabel(d: string, period: Period) {
   if (period === "today") return d; // already HH:00
@@ -73,6 +84,7 @@ export default function Dashboard() {
 
   const { data: summary, isLoading: loadingSummary } = useGetDashboardSummary();
   const { data: lowStock } = useGetLowStockAlerts();
+  const { data: sales } = useListSales();
 
   const { data: chartData } = useQuery<{ date: string; revenue: number; salesCount: number }[]>({
     queryKey: ["/api/dashboard/sales-chart", period],
@@ -84,32 +96,23 @@ export default function Dashboard() {
     queryFn: () => fetch(`/api/dashboard/top-medicines?period=${period}`, { credentials: "include" }).then(r => r.json()),
   });
 
-  const { data: paymentBreakdown } = useQuery<{ method: string; count: number; total: number }[]>({
-    queryKey: ["/api/dashboard/payment-breakdown", period],
-    queryFn: () => fetch(`/api/dashboard/payment-breakdown?period=${period}`, { credentials: "include" }).then(r => r.json()),
-  });
-
-  const { data: weekly } = useQuery<{
-    thisWeek: { revenue: number; count: number };
-    lastWeek: { revenue: number; count: number };
-    changePercent: number;
-  }>({
-    queryKey: ["/api/dashboard/weekly-comparison"],
-    queryFn: () => fetch("/api/dashboard/weekly-comparison", { credentials: "include" }).then(r => r.json()),
-  });
-
-  // derived stats for selected period from chart data
   const periodRevenue = chartData?.reduce((s, r) => s + r.revenue, 0) ?? 0;
-  const periodSales   = chartData?.reduce((s, r) => s + r.salesCount, 0) ?? 0;
-
-  const pieData = paymentBreakdown?.map(p => ({
-    name: METHOD_LABEL[p.method] ?? p.method,
-    value: p.count,
-    total: p.total,
-    method: p.method,
-  })) ?? [];
-
+  const periodSalesCount = chartData?.reduce((s, r) => s + r.salesCount, 0) ?? 0;
+  const recentSales = sales ?? [];
   const maxRevenue = Math.max(...(topMedicines?.map(m => m.totalRevenue) ?? [1]), 1);
+
+  const PAYMENT_LABELS_AR: Record<string, string> = { cash: "نقدي", card: "بطاقة", insurance: "تأمين" };
+  const COLORS = ["hsl(var(--primary))", "#10b981", "#6366f1"];
+  const paymentData = sales ? Object.entries(
+    sales.reduce((acc: Record<string, number>, s: any) => {
+      acc[s.paymentMethod] = (acc[s.paymentMethod] || 0) + s.totalAmount;
+      return acc;
+    }, {})
+  ).map(([name, value]) => ({
+    name: PAYMENT_LABELS_AR[name] || name,
+    value,
+    rawName: name,
+  })) : [];
 
   return (
     <div className="space-y-6" dir="rtl">
@@ -145,10 +148,8 @@ export default function Dashboard() {
           <StatCard
             title={`إيرادات ${PERIOD_LABELS[period]}`}
             value={`${periodRevenue.toFixed(2)} ج.م`}
-            sub={`${periodSales} فاتورة`}
+            sub={`${periodSalesCount} فاتورة`}
             icon={DollarSign} color="bg-primary"
-            trend={period === "week" ? weekly?.changePercent : undefined}
-            trendLabel={period === "week" ? "مقارنةً بالأسبوع الماضي" : undefined}
           />
           <StatCard
             title="إيرادات اليوم"
@@ -211,7 +212,7 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* ── Revenue area chart + payment pie ── */}
+      {/* ── Revenue area chart + sales bar chart ── */}
       <div className="grid gap-6 lg:grid-cols-7">
         <Card className="lg:col-span-4">
           <CardHeader className="pb-2">
@@ -235,11 +236,7 @@ export default function Dashboard() {
                   <YAxis tickLine={false} axisLine={false}
                     tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
                     tickFormatter={fmtMoney} width={72} />
-                  <Tooltip
-                    contentStyle={{ backgroundColor: "hsl(var(--card))", borderColor: "hsl(var(--border))", borderRadius: 8, fontSize: 12 }}
-                    formatter={(v: number) => [fmtMoney(v), "الإيراد"]}
-                    labelFormatter={d => fmtDateLabel(d, period)}
-                  />
+                  <Tooltip content={<CustomTooltip fmt={fmtMoney} />} />
                   <Area type="monotone" dataKey="revenue" stroke="hsl(var(--primary))" strokeWidth={2}
                     fillOpacity={1} fill="url(#gradRevenue)" dot={false} activeDot={{ r: 4 }} />
                 </AreaChart>
@@ -252,50 +249,42 @@ export default function Dashboard() {
 
         <Card className="lg:col-span-3">
           <CardHeader className="pb-2">
-            <CardTitle className="text-base">طرق الدفع — {PERIOD_LABELS[period]}</CardTitle>
+            <CardTitle className="text-base">آخر الفواتير</CardTitle>
           </CardHeader>
           <CardContent>
-            {pieData.length > 0 ? (
+            {recentSales.length > 0 ? (
               <div className="space-y-3">
-                <ResponsiveContainer width="100%" height={160}>
-                  <PieChart>
-                    <Pie data={pieData} cx="50%" cy="50%" innerRadius={45} outerRadius={70}
-                      dataKey="value" paddingAngle={3}>
-                      {pieData.map((entry) => (
-                        <Cell key={entry.method} fill={METHOD_COLOR[entry.method] ?? PIE_COLORS[0]} />
-                      ))}
-                    </Pie>
-                    <Tooltip
-                      contentStyle={{ fontSize: 12, borderRadius: 8, borderColor: "hsl(var(--border))" }}
-                      formatter={(v: number, _n: string, p: { payload: typeof pieData[0] }) =>
-                        [`${v} فاتورة • ${fmtMoney(p.payload.total)}`, p.payload.name]}
-                    />
-                  </PieChart>
-                </ResponsiveContainer>
-                <div className="space-y-2">
-                  {pieData.map(d => (
-                    <div key={d.method} className="flex items-center justify-between text-sm">
-                      <div className="flex items-center gap-2">
-                        <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: METHOD_COLOR[d.method] ?? PIE_COLORS[0] }} />
-                        <span>{d.name}</span>
+                {recentSales.slice(0, 8).map((sale: any) => {
+                  const dateLabel = sale.createdAt
+                    ? new Date(sale.createdAt).toLocaleDateString("ar-EG", {
+                        month: "short",
+                        day: "numeric",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })
+                    : "";
+                  return (
+                    <div key={sale.id} className="flex items-center justify-between text-sm">
+                      <div className="min-w-0">
+                        <div className="font-medium truncate">فاتورة #{sale.id}</div>
+                        <div className="text-xs text-muted-foreground">{dateLabel}</div>
                       </div>
-                      <div className="flex items-center gap-3 text-muted-foreground text-xs">
-                        <span>{d.value} فاتورة</span>
-                        <span className="font-medium text-foreground">{fmtMoney(d.total)}</span>
+                      <div className="text-xs font-bold shrink-0 mr-2">
+                        {fmtMoney(sale.totalAmount)}
                       </div>
                     </div>
-                  ))}
-                </div>
+                  );
+                })}
               </div>
             ) : (
-              <div className="h-[200px] flex items-center justify-center text-muted-foreground text-sm">لا توجد مبيعات في هذه الفترة</div>
+              <div className="h-[160px] flex items-center justify-center text-muted-foreground text-sm">لا توجد فواتير حديثة</div>
             )}
           </CardContent>
         </Card>
       </div>
 
-      {/* ── Daily sales bar + top medicines ── */}
-      <div className="grid gap-6 lg:grid-cols-7">
+      {/* ── Daily sales bar + top medicines + payment methods ── */}
+      <div className="grid gap-6 lg:grid-cols-10">
         <Card className="lg:col-span-4">
           <CardHeader className="pb-2">
             <CardTitle className="text-base">عدد الفواتير — {PERIOD_LABELS[period]}</CardTitle>
@@ -312,11 +301,7 @@ export default function Dashboard() {
                   <YAxis tickLine={false} axisLine={false}
                     tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
                     allowDecimals={false} width={30} />
-                  <Tooltip
-                    contentStyle={{ backgroundColor: "hsl(var(--card))", borderColor: "hsl(var(--border))", borderRadius: 8, fontSize: 12 }}
-                    formatter={(v: number) => [v, "فاتورة"]}
-                    labelFormatter={d => fmtDateLabel(d, period)}
-                  />
+                  <Tooltip content={<CustomTooltip fmt={(v: number) => `${v} فاتورة`} />} />
                   <Bar dataKey="salesCount" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} maxBarSize={30} />
                 </BarChart>
               </ResponsiveContainer>
@@ -358,6 +343,49 @@ export default function Dashboard() {
             )}
           </CardContent>
         </Card>
+
+        <Card className="lg:col-span-3">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base">طرق الدفع الأكثر استخداماً</CardTitle>
+          </CardHeader>
+          <CardContent className="flex flex-col items-center justify-center pt-2">
+            {paymentData.length > 0 ? (
+              <>
+                <ResponsiveContainer width="100%" height={150}>
+                  <PieChart>
+                    <Pie
+                      data={paymentData}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={45}
+                      outerRadius={65}
+                      paddingAngle={4}
+                      dataKey="value"
+                    >
+                      {paymentData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                      ))}
+                    </Pie>
+                    <Tooltip content={<CustomTooltip fmt={fmtMoney} />} />
+                  </PieChart>
+                </ResponsiveContainer>
+                <div className="flex flex-col gap-1.5 mt-2 w-full text-xs">
+                  {paymentData.map((entry, index) => (
+                    <div key={entry.name} className="flex items-center justify-between">
+                      <div className="flex items-center gap-1.5">
+                        <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: COLORS[index % COLORS.length] }} />
+                        <span className="text-muted-foreground">{entry.name}</span>
+                      </div>
+                      <span className="font-bold">{fmtMoney(entry.value)}</span>
+                    </div>
+                  ))}
+                </div>
+              </>
+            ) : (
+              <div className="h-[180px] flex items-center justify-center text-muted-foreground text-sm">لا توجد بيانات دفع</div>
+            )}
+          </CardContent>
+        </Card>
       </div>
 
       {/* ── Low stock grid ── */}
@@ -374,7 +402,7 @@ export default function Dashboard() {
           </CardHeader>
           <CardContent>
             <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-              {lowStock.slice(0, 6).map(med => (
+              {lowStock.slice(0, 6).map((med: any) => (
                 <div key={med.id} className="flex items-center justify-between rounded-lg border bg-card px-3 py-2">
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-medium">{med.name}</p>

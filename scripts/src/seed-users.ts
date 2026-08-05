@@ -1,4 +1,4 @@
-import { db, usersTable } from "@workspace/db";
+import { db, client, usersTable } from "@workspace/db";
 import { scryptSync, randomBytes } from "node:crypto";
 
 function hashPassword(password: string): string {
@@ -30,7 +30,7 @@ async function seedUsers() {
     }
   }
 
-  await (db as any).$client?.end?.();
+  client.close();
   process.exit(0);
 }
 

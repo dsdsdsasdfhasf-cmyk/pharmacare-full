@@ -10,13 +10,19 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import {
+  Plus, Pencil, Trash2, Search, AlertTriangle, Clock,
+  FileSpreadsheet, FileText,
+} from "lucide-react";
+import {
   useListMedicines, useCreateMedicine, useUpdateMedicine, useDeleteMedicine,
   useListCategories, useListSuppliers,
   getListMedicinesQueryKey,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Pencil, Trash2, Search, AlertTriangle, Clock } from "lucide-react";
+import * as XLSX from "xlsx";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
 
 type Medicine = {
   id: number; name: string; genericName: string; barcode: string | null;
@@ -129,7 +135,7 @@ function MedicineDialog({ open, onClose, medicine }: { open: boolean; onClose: (
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="none">بدون فئة</SelectItem>
-                  {categories?.map(c => <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>)}
+                  {categories?.map((c: any) => <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
@@ -141,7 +147,7 @@ function MedicineDialog({ open, onClose, medicine }: { open: boolean; onClose: (
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="none">بدون مورد</SelectItem>
-                  {suppliers?.map(s => <SelectItem key={s.id} value={String(s.id)}>{s.name}</SelectItem>)}
+                  {suppliers?.map((s: any) => <SelectItem key={s.id} value={String(s.id)}>{s.name}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
@@ -228,6 +234,61 @@ export default function Medicines() {
     });
   }
 
+  function handleExportExcel() {
+    if (!medicines) return;
+    const dataToExport = medicines.map((m: any) => ({
+      "اسم الدواء": m.name,
+      "الاسم العلمي": m.genericName,
+      "الباركود": m.barcode || "—",
+      "الفئة": m.categoryName || "—",
+      "المورد": m.supplierName || "—",
+      "الكمية الحالية": m.quantity,
+      "الحد الأدنى": m.minQuantity,
+      "سعر الشراء": m.purchasePrice,
+      "سعر البيع": m.sellingPrice,
+      "تاريخ الانتهاء": m.expiryDate || "—",
+      "موقع التخزين": m.location || "—",
+      "يستلزم وصفة": m.requiresPrescription ? "نعم" : "لا",
+    }));
+    const ws = XLSX.utils.json_to_sheet(dataToExport);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "الأدوية");
+    XLSX.writeFile(wb, `medicines-export-${new Date().toISOString().slice(0, 10)}.xlsx`);
+  }
+
+  function handleExportPDF() {
+    if (!medicines) return;
+    const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
+    
+    // Header
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(16);
+    doc.text("PharmaCare — تقرير مخزون الأدوية", doc.internal.pageSize.width / 2, 15, { align: "center" });
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "normal");
+    doc.text(`تاريخ التصدير: ${new Date().toLocaleDateString("ar-EG")}`, 14, 22);
+
+    autoTable(doc, {
+      startY: 25,
+      head: [["اسم الدواء", "الاسم العلمي", "الباركود", "الفئة", "الكمية", "سعر الشراء", "سعر البيع", "تاريخ الانتهاء"]],
+      body: medicines.map((m: any) => [
+        m.name,
+        m.genericName,
+        m.barcode || "—",
+        m.categoryName || "—",
+        String(m.quantity),
+        `${m.purchasePrice.toFixed(2)} ج.م`,
+        `${m.sellingPrice.toFixed(2)} ج.م`,
+        m.expiryDate || "—",
+      ]),
+      styles: { font: "helvetica", halign: "right", fontSize: 9 },
+      headStyles: { fillColor: [20, 140, 120], textColor: 255 },
+      margin: { left: 14, right: 14 },
+    });
+
+    doc.save(`medicines-inventory-${Date.now()}.pdf`);
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -235,9 +296,17 @@ export default function Medicines() {
           <h1 className="text-3xl font-bold tracking-tight">Medicines (الأدوية)</h1>
           <p className="text-muted-foreground">إدارة مخزون الأدوية ومستويات المخزون.</p>
         </div>
-        <Button onClick={handleAdd} data-testid="button-add-medicine">
-          <Plus className="mr-2 h-4 w-4" /> إضافة دواء
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" size="sm" onClick={handleExportExcel} disabled={isLoading || !medicines?.length}>
+            <FileSpreadsheet className="h-4 w-4 ml-1.5 text-green-600" /> تصدير Excel
+          </Button>
+          <Button variant="outline" size="sm" onClick={handleExportPDF} disabled={isLoading || !medicines?.length}>
+            <FileText className="h-4 w-4 ml-1.5 text-red-500" /> تصدير PDF
+          </Button>
+          <Button onClick={handleAdd} data-testid="button-add-medicine">
+            <Plus className="mr-2 h-4 w-4" /> إضافة دواء
+          </Button>
+        </div>
       </div>
 
       <div className="flex flex-wrap gap-3 items-center">
@@ -285,7 +354,7 @@ export default function Medicines() {
               ) : !medicines?.length ? (
                 <TableRow><TableCell colSpan={8} className="h-24 text-center text-muted-foreground">لا توجد أدوية.</TableCell></TableRow>
               ) : (
-                medicines.map((med) => {
+                medicines.map((med: any) => {
                   const isLow = med.quantity <= med.minQuantity;
                   const expiring = isExpiringSoon(med.expiryDate ?? null);
                   return (

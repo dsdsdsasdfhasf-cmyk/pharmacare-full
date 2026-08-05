@@ -103,7 +103,7 @@ export default function Customers() {
             <TableBody>
               {isLoading ? <TableRow><TableCell colSpan={6} className="h-24 text-center">جاري التحميل...</TableCell></TableRow>
                 : !customers?.length ? <TableRow><TableCell colSpan={6} className="h-24 text-center text-muted-foreground">لا يوجد عملاء.</TableCell></TableRow>
-                : customers.map((c) => (
+                : customers.map((c: any) => (
                   <TableRow key={c.id} data-testid={`row-customer-${c.id}`}>
                     <TableCell>
                       <div className="flex items-center gap-2"><User className="h-4 w-4 text-muted-foreground shrink-0" /><span className="font-medium">{c.name}</span></div>

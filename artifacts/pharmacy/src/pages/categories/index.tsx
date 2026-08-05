@@ -135,7 +135,7 @@ export default function Categories() {
               ) : !categories?.length ? (
                 <TableRow><TableCell colSpan={4} className="h-24 text-center text-muted-foreground">لا توجد فئات بعد.</TableCell></TableRow>
               ) : (
-                categories.map((cat) => (
+                categories.map((cat: any) => (
                   <TableRow key={cat.id} data-testid={`row-category-${cat.id}`}>
                     <TableCell className="text-muted-foreground">{cat.id}</TableCell>
                     <TableCell className="font-medium">{cat.name}</TableCell>

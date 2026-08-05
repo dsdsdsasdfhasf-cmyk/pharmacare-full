@@ -7,8 +7,9 @@ import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import {
   Database, Download, FileJson, FileSpreadsheet,
-  CheckCircle2, Clock, HardDrive, ShieldCheck,
+  CheckCircle2, Clock, HardDrive, ShieldCheck, Upload, AlertOctagon
 } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
 import * as XLSX from "xlsx";
 
 interface BackupData {
@@ -79,9 +80,50 @@ const TABLE_LABELS: Record<string, string> = {
 
 export default function Settings() {
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   const [lastBackup, setLastBackup] = useState<string | null>(null);
   const [loadingJson, setLoadingJson] = useState(false);
   const [loadingExcel, setLoadingExcel] = useState(false);
+  const [restoring, setRestoring] = useState(false);
+
+  async function handleRestore(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    if (!confirm("تحذير: هذا الإجراء سيقوم بحذف جميع البيانات الحالية واستبدالها بالبيانات الموجودة في الملف المرفوع. هل تريد الاستمرار؟")) {
+      event.target.value = "";
+      return;
+    }
+
+    setRestoring(true);
+    try {
+      const text = await file.text();
+      const backupData = JSON.parse(text);
+      if (!backupData.tables || !backupData.version) {
+        throw new Error("ملف النسخة الاحتياطية غير صالح.");
+      }
+
+      const res = await fetch("/api/backup/restore", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(backupData),
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || "فشل رفع واستعادة البيانات");
+      }
+
+      toast({ title: "تم الاسترجاع بنجاح", description: "تمت استعادة جميع الجداول وتحديث البيانات بنجاح" });
+      queryClient.invalidateQueries();
+    } catch (err: any) {
+      toast({ title: "فشل الاسترجاع", description: err.message, variant: "destructive" });
+    } finally {
+      setRestoring(false);
+      event.target.value = "";
+    }
+  }
 
   const { data: preview } = useQuery<BackupData>({
     queryKey: ["/api/backup/preview"],
@@ -193,6 +235,50 @@ export default function Settings() {
               <FileSpreadsheet className="h-4 w-4" />
               {loadingExcel ? "جاري التحضير..." : "تنزيل Excel"}
             </Button>
+          </CardContent>
+        </Card>
+      </div>
+
+      <Separator />
+
+      {/* Restore options */}
+      <div className="space-y-3">
+        <h2 className="text-base font-semibold flex items-center gap-2">
+          <Upload className="h-4 w-4" />
+          خيارات الاستيراد والاستعادة
+        </h2>
+
+        <Card className="border-amber-400 bg-amber-500/5">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm flex items-center gap-2 text-amber-700">
+              <AlertOctagon className="h-5 w-5 text-amber-600" />
+              استرجاع قاعدة البيانات من ملف JSON
+            </CardTitle>
+            <CardDescription className="text-xs text-amber-800">
+              ملاحظة: هذا الإجراء سيقوم بمسح كافة السجلات الحالية وتعويضها بالكامل بالنسخة الاحتياطية
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="pt-0 flex gap-2">
+            <label className="w-full">
+              <Button
+                asChild
+                variant="outline"
+                className="w-full gap-2 border-amber-300 hover:bg-amber-100/50 cursor-pointer"
+                disabled={restoring}
+              >
+                <span>
+                  <Upload className="h-4 w-4 text-amber-600" />
+                  {restoring ? "جاري استعادة البيانات..." : "اختر ملف Backup (JSON)"}
+                </span>
+              </Button>
+              <input
+                type="file"
+                accept=".json"
+                onChange={handleRestore}
+                disabled={restoring}
+                className="hidden"
+              />
+            </label>
           </CardContent>
         </Card>
       </div>

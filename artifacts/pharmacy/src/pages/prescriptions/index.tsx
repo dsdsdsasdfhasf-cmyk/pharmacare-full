@@ -58,7 +58,7 @@ function PrescriptionDialog({ open, onClose, prescription }: { open: boolean; on
               <SelectTrigger data-testid="select-prescription-customer"><SelectValue placeholder="اختر العميل (اختياري)" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="none">بدون عميل</SelectItem>
-                {customers?.map(c => <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>)}
+                {customers?.map((c: any) => <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>)}
               </SelectContent>
             </Select>
           </div>
@@ -116,7 +116,7 @@ export default function Prescriptions() {
             <TableBody>
               {isLoading ? <TableRow><TableCell colSpan={7} className="h-24 text-center">جاري التحميل...</TableCell></TableRow>
                 : !prescriptions?.length ? <TableRow><TableCell colSpan={7} className="h-24 text-center text-muted-foreground">لا توجد وصفات طبية.</TableCell></TableRow>
-                : prescriptions.map((rx) => (
+                : prescriptions.map((rx: any) => (
                   <TableRow key={rx.id} data-testid={`row-prescription-${rx.id}`}>
                     <TableCell className="text-muted-foreground font-mono">#{rx.id}</TableCell>
                     <TableCell>{rx.customerName || <span className="text-muted-foreground">—</span>}</TableCell>

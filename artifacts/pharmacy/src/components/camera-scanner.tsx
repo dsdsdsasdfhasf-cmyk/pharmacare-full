@@ -31,7 +31,7 @@ export function CameraScanner({ onResult, onError }: CameraScannerProps) {
     deviceId,
     paused: !active,
     onDecodeResult(result) {
-      const text = result.getText();
+      const text = (result as any).getText();
       if (text === lastScanned.current) return;
       lastScanned.current = text;
       onResult(text);

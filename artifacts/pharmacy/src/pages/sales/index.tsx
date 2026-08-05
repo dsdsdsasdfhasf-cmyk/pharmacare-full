@@ -10,7 +10,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useListSales, useGetSale, getGetSaleQueryKey, getListSalesQueryKey } from "@workspace/api-client-react";
 import { useQueryClient, useMutation } from "@tanstack/react-query";
 import { Link } from "wouter";
-import { Plus, Eye, Calendar, RotateCcw, Printer } from "lucide-react";
+import { Plus, Eye, Calendar, RotateCcw, Printer, FileSpreadsheet, FileText } from "lucide-react";
+import * as XLSX from "xlsx";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
 import { useToast } from "@/hooks/use-toast";
 import { ReceiptModal, type ReceiptData } from "@/components/receipt";
 
@@ -90,7 +93,7 @@ function SaleDetailDialog({ saleId, onClose, onPrint, onRefundRequest }: {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {sale.items.map((item) => (
+                {sale.items.map((item: any) => (
                   <TableRow key={item.id}>
                     <TableCell className="font-medium">{item.medicineName}</TableCell>
                     <TableCell className="text-center">{item.quantity}</TableCell>
@@ -171,19 +174,80 @@ export default function Sales() {
     },
   });
 
-  const totalRevenue = sales?.filter(s => s.status === "completed").reduce((sum, s) => sum + s.totalAmount, 0) ?? 0;
-  const refundedCount = sales?.filter(s => s.status === "refunded").length ?? 0;
+  const totalRevenue = sales?.filter((s: any) => s.status === "completed").reduce((sum: any, s: any) => sum + s.totalAmount, 0) ?? 0;
+  const refundedCount = sales?.filter((s: any) => s.status === "refunded").length ?? 0;
+
+  function handleExportExcel() {
+    if (!sales) return;
+    const dataToExport = sales.map((s: any) => ({
+      "رقم الفاتورة": s.id,
+      "اسم العميل": s.customerName || "بدون عميل",
+      "الوصفة الطبية": s.prescriptionId ? "نعم" : "لا",
+      "طريقة الدفع": PAYMENT_LABELS[s.paymentMethod] || s.paymentMethod,
+      "الحالة": STATUS_LABELS[s.status] || s.status,
+      "إجمالي المبلغ": s.totalAmount,
+      "الخصم": s.discount,
+      "التاريخ": new Date(s.createdAt).toLocaleString("ar-EG"),
+      "ملاحظات": s.notes || "—",
+    }));
+    const ws = XLSX.utils.json_to_sheet(dataToExport);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "المبيعات");
+    XLSX.writeFile(wb, `sales-export-${new Date().toISOString().slice(0, 10)}.xlsx`);
+  }
+
+  function handleExportPDF() {
+    if (!sales) return;
+    const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
+    
+    // Header
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(16);
+    doc.text("PharmaCare — تقرير المبيعات والفواتير", doc.internal.pageSize.width / 2, 15, { align: "center" });
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "normal");
+    doc.text(`تاريخ التصدير: ${new Date().toLocaleDateString("ar-EG")}`, 14, 22);
+
+    autoTable(doc, {
+      startY: 25,
+      head: [["رقم الفاتورة", "العميل", "طريقة الدفع", "الحالة", "إجمالي المبلغ", "الخصم", "التاريخ"]],
+      body: sales.map((s: any) => [
+        `#${s.id}`,
+        s.customerName || "بدون عميل",
+        PAYMENT_LABELS[s.paymentMethod] || s.paymentMethod,
+        STATUS_LABELS[s.status] || s.status,
+        `${s.totalAmount.toFixed(2)} ج.م`,
+        `${s.discount.toFixed(2)} ج.م`,
+        new Date(s.createdAt).toLocaleString("ar-EG"),
+      ]),
+      styles: { font: "helvetica", halign: "right", fontSize: 9 },
+      headStyles: { fillColor: [20, 140, 120], textColor: 255 },
+      margin: { left: 14, right: 14 },
+    });
+
+    doc.save(`sales-report-${Date.now()}.pdf`);
+  }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" dir="rtl">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">المبيعات</h1>
-          <p className="text-muted-foreground">سجل جميع المبيعات والفواتير.</p>
+          <h1 className="text-3xl font-bold tracking-tight">سجل المبيعات</h1>
+          <p className="text-muted-foreground mt-1">عرض وإدارة فواتير المبيعات وعمليات الاسترجاع.</p>
         </div>
-        <Button asChild data-testid="button-new-sale">
-          <Link href="/sales/new"><Plus className="mr-2 h-4 w-4" /> بيع جديد (POS)</Link>
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" size="sm" onClick={handleExportExcel} disabled={isLoading || !sales?.length}>
+            <FileSpreadsheet className="h-4 w-4 ml-1.5 text-green-600" /> تصدير Excel
+          </Button>
+          <Button variant="outline" size="sm" onClick={handleExportPDF} disabled={isLoading || !sales?.length}>
+            <FileText className="h-4 w-4 ml-1.5 text-red-500" /> تصدير PDF
+          </Button>
+          <Link href="/sales/new">
+            <Button className="gap-2">
+              <Plus className="h-4 w-4" /> فاتورة جديدة
+            </Button>
+          </Link>
+        </div>
       </div>
 
       <div className="flex flex-wrap gap-3 items-center">
@@ -224,7 +288,7 @@ export default function Sales() {
                 <TableRow><TableCell colSpan={8} className="h-24 text-center">جاري التحميل...</TableCell></TableRow>
               ) : !sales?.length ? (
                 <TableRow><TableCell colSpan={8} className="h-24 text-center text-muted-foreground">لا توجد مبيعات.</TableCell></TableRow>
-              ) : sales.map((s) => (
+              ) : sales.map((s: any) => (
                 <TableRow key={s.id} data-testid={`row-sale-${s.id}`} className={s.status === "refunded" ? "opacity-60" : ""}>
                   <TableCell className="font-mono text-muted-foreground">#{s.id}</TableCell>
                   <TableCell>{s.customerName || <span className="text-muted-foreground">بدون عميل</span>}</TableCell>

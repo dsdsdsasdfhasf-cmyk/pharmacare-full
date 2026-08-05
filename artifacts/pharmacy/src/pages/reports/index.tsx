@@ -301,7 +301,7 @@ export default function Reports() {
           {movementSearch && medicines && medicines.length > 0 && !movement && (
             <Card>
               <CardContent className="p-2">
-                {medicines.slice(0, 8).map(m => (
+                {medicines.slice(0, 8).map((m: any) => (
                   <button
                     key={m.id}
                     className="w-full text-right px-3 py-2 hover:bg-muted rounded-md transition-colors"

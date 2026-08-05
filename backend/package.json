@@ -1,0 +1,18 @@
+{
+  "name": "workspace",
+  "version": "0.0.0",
+  "license": "MIT",
+  "scripts": {
+    "typecheck": "pnpm --filter @workspace/api-server run typecheck",
+    "build": "pnpm --filter @workspace/api-server run build",
+    "dev": "pnpm --filter @workspace/api-server run dev",
+    "start": "pnpm --filter @workspace/api-server run start"
+  },
+  "private": true,
+  "devDependencies": {
+    "docx": "^9.7.1",
+    "drizzle-orm": "^0.45.2",
+    "prettier": "^3.8.3",
+    "typescript": "~5.9.3"
+  }
+}
